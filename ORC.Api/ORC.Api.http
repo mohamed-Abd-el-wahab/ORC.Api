@@ -1,0 +1,6 @@
+@ORC.Api_HostAddress = http://localhost:5118
+
+GET {{ORC.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
