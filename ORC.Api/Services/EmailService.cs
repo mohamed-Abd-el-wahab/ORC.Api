@@ -19,19 +19,22 @@ namespace ORC.Api.Models
     {
         private readonly IConfiguration _configuration;
         private readonly ILogger<EmailService> _logger;
-        private readonly string _templatePath;
+        private readonly string _baseTemplatePath;
+        private readonly IWebHostEnvironment _environment;
 
         public EmailService(IConfiguration configuration, IWebHostEnvironment environment, ILogger<EmailService> logger)
         {
             _configuration = configuration;
             _logger = logger;
+            _environment = environment;
+            
             if (string.IsNullOrEmpty(environment.WebRootPath))
             {
                 _logger.LogError("WebRootPath is null or empty.");
                 throw new ArgumentNullException(nameof(environment.WebRootPath), "WebRootPath cannot be null or empty.");
             }
-            _templatePath = Path.Combine(environment.WebRootPath, "EmailTemplates", "EmailTemplate.html");
-            logger.LogInformation($"Template path set to {_templatePath}");
+            _baseTemplatePath = Path.Combine(environment.WebRootPath, "EmailTemplates", "Shared", "BaseTemplate.html");
+            logger.LogInformation($"Base template path set to {_baseTemplatePath}");
         }
 
         public async Task SendEmailAsync(string to, string subject, string htmlContent, string userName)
@@ -83,26 +86,33 @@ namespace ORC.Api.Models
         {
             try
             {
-                if (!File.Exists(_templatePath))
+                if (!File.Exists(_baseTemplatePath))
                 {
-                    _logger.LogError($"Template file not found at {_templatePath}");
-                    return messageContent;  // Return the plain message if the template doesn't exist
+                    _logger.LogError($"Base template file not found at {_baseTemplatePath}");
+                    return messageContent;
                 }
 
-                string template = await File.ReadAllTextAsync(_templatePath);
-                template = template.Replace("{{content}}", messageContent);
-                template = template.Replace("{{name}}", userName);  // Replace the user's name
+                string template = await File.ReadAllTextAsync(_baseTemplatePath);
+                
+                // Replace placeholders in the base template
+                template = template.Replace("[Page_Title]", "ORC Battle Notification");
+                template = template.Replace("[ORC_LOGO_URL]", "https://openrobotcombat.com/images/logo.png"); // Update with actual logo URL
+                template = template.Replace("[Email_Content]", messageContent);
+                
+                // Replace user-specific placeholders in the content
+                template = template.Replace("[User's Name]", userName);
+                
                 return template;
             }
             catch (UnauthorizedAccessException uaEx)
             {
-                _logger.LogError(uaEx, $"Access to email template file denied: {_templatePath}");
-                throw new UnauthorizedAccessException($"Insufficient permissions to access email template file: {_templatePath}", uaEx);
+                _logger.LogError(uaEx, $"Access to email template file denied: {_baseTemplatePath}");
+                throw new UnauthorizedAccessException($"Insufficient permissions to access email template file: {_baseTemplatePath}", uaEx);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error reading email template at {_templatePath}, using plain message content.");
-                return messageContent;  // Fallback to plain content if reading the template fails
+                _logger.LogError(ex, $"Error reading email template at {_baseTemplatePath}, using plain message content.");
+                return messageContent;
             }
         }
     }

@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ORC.Api.Data;
 
@@ -11,9 +12,11 @@ using ORC.Api.Data;
 namespace ORC.Api.Migrations
 {
     [DbContext(typeof(OrcDbContext))]
-    partial class OrcDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250221194224_update-From")]
+    partial class updateFrom
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

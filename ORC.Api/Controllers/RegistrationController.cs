@@ -32,20 +32,20 @@ namespace ORC.Api.Controllers
             string emailContent = System.IO.File.ReadAllText("wwwroot/EmailTemplates/Registration/RegistrationEmail.html");
 
             // Replace content placeholders
-            emailContent = emailContent.Replace("[User's Name]", $"{registration.FirstName} {registration.LastName}")
-                                    .Replace("[User's Email]", registration.Email)
+            emailContent = emailContent.Replace("[User's Name]", registration.LeaderName)
+                                    .Replace("[User's Email]", registration.LeaderEmail)
                                     .Replace("[Summary]", $"Team {registration.TeamName} from {registration.Institution}");
 
             // Replace base template placeholders
-            string emailBody = baseTemplate.Replace("[Page_Title]", "ORC Battle - Submission Confirmation")
+            string emailBody = baseTemplate.Replace("[Page_Title]", "ORC Battle - Registration Confirmation")
                                         .Replace("[Email_Content]", emailContent)
                                         .Replace("[ORC_LOGO_URL]", "https://openrobotcombat.com/logo.png");
 
             await _emailService.SendEmailAsync(
-                registration.Email,
-                "Thank You for Your Submission!",
+                registration.LeaderEmail,
+                "Thank You for Registering for ORC Battle!",
                 emailBody,
-                $"{registration.FirstName} {registration.LastName}"
+                registration.LeaderName
             );
 
             return CreatedAtAction(nameof(GetRegistration), new { id = registration.Id }, registration);
