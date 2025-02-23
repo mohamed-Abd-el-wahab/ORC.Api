@@ -11,10 +11,21 @@ namespace ORC.Api
         {
             var builder = WebApplication.CreateBuilder(args);
 
-            // Add services to the container.
-            builder.Services.AddControllers();
+            #region Configure Services
+            // Configure Logging
+            builder.Logging.ClearProviders();
+            builder.Logging.AddConsole();
+            builder.Logging.AddDebug();
+            builder.Logging.AddEventLog();
 
-            // Configure Swagger/OpenAPI
+            // Add services to the container
+            builder.Services.AddControllers()
+                .AddJsonOptions(options =>
+                {
+                    options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+                });
+
+            // Configure Swagger/OpenAPI with enhanced security
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen(c =>
             {
@@ -29,40 +40,97 @@ namespace ORC.Api
             // Add Email Service
             builder.Services.AddScoped<IEmailService, EmailService>();
 
-            // Add DbContext with SQL Server
+            // Add DbContext with SQL Server and enhanced configuration
             builder.Services.AddDbContext<OrcDbContext>(options =>
-                options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+            {
+                options.UseSqlServer(
+                    builder.Configuration.GetConnectionString("DefaultConnection"),
+                    sqlOptions =>
+                    {
+                        sqlOptions.EnableRetryOnFailure(
+                            maxRetryCount: 5,
+                            maxRetryDelay: TimeSpan.FromSeconds(30),
+                            errorNumbersToAdd: null);
+                        sqlOptions.CommandTimeout(30);
+                    });
+                options.UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
+            });
 
-            // Configure CORS
+            // Configure CORS with more secure settings
             builder.Services.AddCors(options =>
             {
                 options.AddPolicy("AllowFrontend",
                     policy => policy
-                        .WithOrigins("http://localhost:5173") // Allow requests from the frontend
+                        .WithOrigins("http://localhost:5173")
                         .AllowAnyMethod()
-                        .AllowAnyHeader());
+                        .AllowAnyHeader()
+                        .AllowCredentials());
             });
+
+            // Add response compression
+            builder.Services.AddResponseCompression(options =>
+            {
+                options.EnableForHttps = true;
+            });
+            #endregion
 
             var app = builder.Build();
 
-            // Configure the HTTP request pipeline.
+            // Ensure database exists and is up to date
+            using (var scope = app.Services.CreateScope())
+            {
+                var services = scope.ServiceProvider;
+                var logger = services.GetRequiredService<ILogger<Program>>();
+                try
+                {
+                    var context = services.GetRequiredService<OrcDbContext>();
+                    context.Database.Migrate();
+                    logger.LogInformation("Database migration completed successfully");
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "An error occurred while migrating the database");
+                }
+            }
+
+            #region Configure Pipeline
+            // Configure Error Handling
             if (app.Environment.IsDevelopment())
             {
-                // Enable Swagger only in Development
+                app.UseDeveloperExceptionPage();
                 app.UseSwagger();
                 app.UseSwaggerUI(c =>
                 {
                     c.SwaggerEndpoint("/swagger/v1/swagger.json", "ORC Battle API V1");
                 });
             }
+            else
+            {
+                app.UseExceptionHandler("/Error");
+                app.UseHsts();
+            }
 
-            app.UseHttpsRedirection(); // Redirect HTTP to HTTPS
-            app.UseCors("AllowFrontend"); // Apply the CORS policy
-            app.UseAuthorization(); // Enable Authorization middleware
+            // Configure Security Headers
+            app.Use(async (context, next) =>
+            {
+                context.Response.Headers.Add("X-Content-Type-Options", "nosniff");
+                context.Response.Headers.Add("X-Frame-Options", "DENY");
+                context.Response.Headers.Add("X-XSS-Protection", "1; mode=block");
+                context.Response.Headers.Add("Referrer-Policy", "strict-origin-when-cross-origin");
+                await next();
+            });
 
-            app.MapControllers(); // Map controller routes
+            app.UseHttpsRedirection();
+            app.UseCors("AllowFrontend");
+            
+            // Add compression before endpoints
+            app.UseResponseCompression();
+            
+            app.UseAuthorization();
+            app.MapControllers();
+            #endregion
 
-            app.Run(); // Run the application
+            app.Run();
         }
     }
 }
