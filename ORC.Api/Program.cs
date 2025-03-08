@@ -56,15 +56,15 @@ namespace ORC.Api
                 options.UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
             });
 
-            // Configure CORS with more secure settings
+                // Configure CORS with more permissive settings for debugging
             builder.Services.AddCors(options =>
             {
                 options.AddPolicy("AllowFrontend",
                     policy => policy
-                        .WithOrigins("http://localhost:5173")
+                        .AllowAnyOrigin()  // Allow requests from any origin
                         .AllowAnyMethod()
-                        .AllowAnyHeader()
-                        .AllowCredentials());
+                        .AllowAnyHeader());
+                        // Note: Cannot use AllowCredentials with AllowAnyOrigin
             });
 
             // Add response compression
