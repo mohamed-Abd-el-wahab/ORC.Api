@@ -11,6 +11,7 @@ namespace ORC.Api.Controllers
     {
         private readonly OrcDbContext _context;
         private readonly IEmailService _emailService;
+        private readonly string _adminEmail = "open.robot.combat@gmail.com";
 
         public RegistrationController(OrcDbContext context, IEmailService emailService)
         {
@@ -27,7 +28,7 @@ namespace ORC.Api.Controllers
             _context.Registrations.Add(registration);
             await _context.SaveChangesAsync();
 
-            // Send confirmation email
+            // Send confirmation email to user
             string baseTemplate = System.IO.File.ReadAllText("wwwroot/EmailTemplates/Shared/BaseTemplate.html");
             string emailContent = System.IO.File.ReadAllText("wwwroot/EmailTemplates/Registration/RegistrationEmail.html");
 
@@ -46,6 +47,40 @@ namespace ORC.Api.Controllers
                 "Thank You for Registering for ORC Battle!",
                 emailBody,
                 registration.LeaderName
+            );
+
+            // Send notification email to admin
+            string adminEmailContent = System.IO.File.ReadAllText("wwwroot/EmailTemplates/Registration/AdminNotificationEmail.html");
+
+            // Replace content placeholders for admin email
+            adminEmailContent = adminEmailContent
+                .Replace("[TeamName]", registration.TeamName)
+                .Replace("[Institution]", registration.Institution)
+                .Replace("[RegistrationDate]", registration.RegistrationDate.ToString("yyyy-MM-dd HH:mm:ss"))
+                .Replace("[TeamSize]", registration.TeamSize.ToString())
+                .Replace("[LeaderName]", registration.LeaderName)
+                .Replace("[LeaderEmail]", registration.LeaderEmail)
+                .Replace("[LeaderPhone]", registration.LeaderPhone)
+                .Replace("[TeamMembers]", registration.TeamMembers)
+                .Replace("[HowDidYouKnow]", registration.HowDidYouKnow)
+                .Replace("[OtherSource]", registration.OtherSource ?? "N/A")
+                .Replace("[RoboticsExperience]", registration.RoboticsExperience)
+                .Replace("[TechnicalSkills]", registration.TechnicalSkills)
+                .Replace("[HasPriorExperience]", registration.HasPriorExperience ? "Yes" : "No")
+                .Replace("[PriorExperienceDetails]", registration.PriorExperienceDetails ?? "N/A")
+                .Replace("[RelevantProjects]", registration.RelevantProjects)
+                .Replace("[AnticipatedChallenges]", registration.AnticipatedChallenges);
+
+            // Replace base template placeholders for admin email
+            string adminEmailBody = baseTemplate.Replace("[Page_Title]", "ORC Battle - New Registration")
+                                        .Replace("[Email_Content]", adminEmailContent)
+                                        .Replace("[ORC_LOGO_URL]", "https://openrobotcombat.com/logo.png");
+
+            await _emailService.SendEmailAsync(
+                _adminEmail,
+                $"New ORC Battle Registration: {registration.TeamName}",
+                adminEmailBody,
+                "ORC Admin"
             );
 
             return CreatedAtAction(nameof(GetRegistration), new { id = registration.Id }, registration);
